@@ -1,0 +1,16 @@
+services:
+  rolesnap-db:
+    image: postgres:16
+    container_name: rolesnap-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rolesnapdb
+    ports:
+      - "5433:5432"
+    volumes:
+      - rolesnap_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  rolesnap_postgres_data:
