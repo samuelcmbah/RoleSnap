@@ -1,4 +1,4 @@
-@RoleSnap.API_HostAddress = http://localhost:5124
+@RoleSnap.API_HostAddress = http://localhost:5182
 
 GET {{RoleSnap.API_HostAddress}}/weatherforecast/
 Accept: application/json
