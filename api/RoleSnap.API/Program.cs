@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RoleSnap.Api.Data;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,11 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference(options =>
+    {
+        options.WithTitle("RoleSnap API")
+                .WithTheme(ScalarTheme.Moon);
+    });
 }
 
 app.UseHttpsRedirection();
