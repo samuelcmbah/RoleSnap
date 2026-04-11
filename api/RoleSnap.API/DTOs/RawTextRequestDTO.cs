@@ -1,6 +1,6 @@
 namespace RoleSnap.Api.DTOs;
 
-public class RawTextRequest
+public class RawTextRequestDTO
 {
     public string Text { get; set; } = string.Empty;
 

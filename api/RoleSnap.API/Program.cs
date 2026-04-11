@@ -13,6 +13,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddHttpClient<AiParserService>();
+builder.Services.AddScoped<AiParserService>();
 
 var app = builder.Build();
 
