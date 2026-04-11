@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "RoleSnap",
+  "version": "1.0.0",
+  "description": "Save job posts from anywhere — WhatsApp, LinkedIn, Twitter — with one right-click.",
+
+  "permissions": [
+    "contextMenus",
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "RoleSnap"
+  }
+}
