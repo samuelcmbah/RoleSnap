@@ -17,6 +17,7 @@
     "wrangler": "^4.82.2"
   },
   "dependencies": {
+    "@libsql/client": "^0.17.2",
     "hono": "^4.12.12"
   }
 }
