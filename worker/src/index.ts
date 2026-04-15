@@ -1,5 +1,5 @@
-import { Hono } from 'hono'
-import { createClient } from '@libsql/client'
+import { Hono } from 'hono' //organizes worker into routes and handlers
+import { createClient } from '@libsql/client' //lets worker talk to db
 
 
 // defines the expected shape of the environment variables
