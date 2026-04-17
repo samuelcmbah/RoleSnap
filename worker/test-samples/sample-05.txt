@@ -1,0 +1,50 @@
+Python + Full-Stack (JS) Developer
+
+Company: Turing  
+Category: Software Development  
+Work Mode: Remote  
+Type: Contract  
+
+Role Overview:
+Turing is seeking developers skilled in Python and JavaScript/TypeScript to work on advanced AI systems with leading US companies. You will help build, evaluate, and improve cutting-edge AI solutions.
+
+Required Skills:
+- Python
+- JavaScript / TypeScript
+- Node.js, Nest.js
+- React / Vue / Angular
+- Strong understanding of ES6
+- Scalable web application development
+- Clean, maintainable code practices
+- Docker (mandatory)
+- Good English communication skills
+
+Technologies:
+Backend: Node.js, Nest.js  
+Frontend: React, Vue, Angular  
+Languages: Python, JavaScript, TypeScript  
+
+Day-to-Day Responsibilities:
+- Design, develop, and maintain high-quality code
+- Train and optimize AI models
+- Evaluate and benchmark model performance
+- Rank and analyze AI-generated responses
+- Work on supervised fine-tuning datasets
+- Collaborate on RLHF processes
+- Conduct code reviews and improve documentation
+- Work with cross-functional teams
+- Explore new tools and AI methodologies
+
+Offer Details:
+- Fully remote
+- Contract duration: 1 month (starts next week)
+- Minimum 20 hours/week (options: 20, 30, 40 hrs)
+- At least 4 hours/day
+- Must overlap 4 hours with PST (Pacific Standard Time, US time zone — Nigeria is about 9 hours ahead)
+
+Evaluation Process:
+- 60-minute technical interview
+- 15-minute cultural interview and offer discussion
+
+Apply Here:
+https://work.turing.com/r/rA2P0NPYCo

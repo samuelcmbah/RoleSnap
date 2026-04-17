@@ -1,0 +1,49 @@
+JavaScript / TypeScript Full-Stack Developer
+
+Company: Turing  
+Category: Software Development  
+Work Mode: Remote  
+Type: Contract  
+
+Role Overview:
+Turing is seeking talented JavaScript/TypeScript developers to work on cutting-edge AI systems with leading US companies. You will contribute to building, evaluating, and improving advanced AI solutions.
+
+Required Skills:
+- JavaScript
+- TypeScript
+- Node.js
+- Nest.js
+- React / Vue / Angular
+- Strong understanding of ES6
+- Scalable web application development
+- Clean, maintainable code practices
+- Good English communication skills
+
+Technologies:
+Backend: Node.js, Nest.js  
+Frontend: React, Vue, Angular  
+Languages: JavaScript, TypeScript  
+
+Day-to-Day Responsibilities:
+- Design, develop, and maintain high-quality code
+- Evaluate and improve AI model performance
+- Rank and analyze AI-generated responses
+- Work on supervised fine-tuning datasets
+- Collaborate on RLHF processes
+- Conduct code reviews and improve documentation
+- Work with cross-functional teams
+
+Offer Details:
+- Fully remote
+- Contract duration: 1 month (starts next week)
+- Minimum 20 hours/week (options: 20, 30, 40 hrs)
+- At least 4 hours/day
+- Must overlap 4 hours with PST
+- No medical or paid leave
+
+Evaluation Process:
+- 60-minute technical interview
+- 15-minute cultural interview and offer discussion
+
+Apply Here:
+https://work.turing.com/r/8Qjh-Zh4BY
