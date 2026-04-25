@@ -145,6 +145,13 @@ app.post('/api/parse', async (c) => {
 		return c.json({ error: 'Text too short to be a valid job post' }, 400)
 	}
 
+	if (text.length > 5000) {
+		return c.json({ error: 'Validation Failed: Text exceeds 5,000 character limit' }, 400)
+	}
+
+		const sanitizedText = text.trim();
+
+
 	try {
 		const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
 			method: 'POST',
@@ -180,7 +187,7 @@ Example of non-job: {"jobs": []}
 Example of job: {"jobs": [{"title": "...", "company": "...", ...}]}
 `
 					},
-					{ role: 'user', content: text }
+					{ role: 'user', content: sanitizedText }
 				],
 				response_format: { type: "json_object" },
 				temperature: 0.1 // Keep it deterministic to reduce hallucinations
@@ -188,6 +195,13 @@ Example of job: {"jobs": [{"title": "...", "company": "...", ...}]}
 		})
 
 		const data: any = await response.json()
+
+		// Handle Groq-level errors (rate limits, etc.)
+		if (data.error) {
+			console.error('Groq API Error:', data.error)
+			return c.json({ error: 'AI provider error' }, 502)
+		}
+		
 		const content = JSON.parse(data.choices[0]?.message?.content || '{"jobs": []}')
 		
 		// If the AI determined it wasn't a job, content.jobs will be []
