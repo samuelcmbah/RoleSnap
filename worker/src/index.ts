@@ -22,122 +22,38 @@ app.get('/', (c) => {
 	return c.text('RoleSnap API is running!')
 })
 
-// ========================
-// PARSE ENDPOINT
-// ========================
-// app.post('/api/parse', async (c) => {
-// 	const { text, sourceUrl } = await c.req.json()
+const rateLimitMap = new Map<string, { count: number, lastReset: number }>();
 
-// 	if (!text || text.trim().length < 30) {
-// 		return c.json({ error: 'Text too short or missing' }, 400)
-// 	}
+const rateLimiter = async (c: any, next: any) => {
+	const ip = c.req.header('cf-connecting-ip') || 'anonymous';
+	const now = Date.now();
+	const windowMs = 60 * 1000; // 1 minute window
+	const maxRequests = 10;     // Max 10 requests per minute
 
-// 	try {
-// 		// =========================
-// 		// STEP 1: CLASSIFICATION (Hardened)
-// 		// =========================
-// 		const classifyRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-// 			method: 'POST',
-// 			headers: {
-// 				'Authorization': `Bearer ${c.env.GROQ_API_KEY}`,
-// 				'Content-Type': 'application/json',
-// 			},
-// 			body: JSON.stringify({
-// 				model: 'llama-3.3-70b-versatile',
-// 				messages: [
-// 					{
-// 						role: 'system',
-// 						content: `You are a job post classifier. Return a JSON object: {"is_job": true} if the text is a job, internship, or contract. Return {"is_job": false} for anything else.`
-// 					},
-// 					{ role: 'user', content: text }
-// 				],
-// 				response_format: { type: "json_object" } // Using JSON mode for Step 1 too!
-// 			})
-// 		})
+	const record = rateLimitMap.get(ip) || { count: 0, lastReset: now };
 
-// 		const classifyData: any = await classifyRes.json()
-// 		const classContent = JSON.parse(classifyData.choices[0]?.message?.content || '{}')
-		
-// 		// 🔒 HARD STOP: Only proceed if is_job is explicitly true
-// 		if (classContent.is_job !== true) {
-// 			console.log('Vetoed: Not a job post.')
-// 			return c.json([]) // Return empty array as per blueprint
-// 		}
+	// If 1 minute has passed, reset the counter
+	if (now - record.lastReset > windowMs) {
+		record.count = 0;
+		record.lastReset = now;
+	}
 
-// 		// =========================
-// 		// STEP 2: EXTRACTION
-// 		// =========================
-// 		const extractRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-// 			method: 'POST',
-// 			headers: {
-// 				'Authorization': `Bearer ${c.env.GROQ_API_KEY}`,
-// 				'Content-Type': 'application/json',
-// 			},
-// 			body: JSON.stringify({
-// 				model: 'llama-3.3-70b-versatile',
-// 				messages: [
-// 					{
-// 						role: 'system',
-// 						content: `
-// You are a Job Data Extractor.
+	if (record.count >= maxRequests) {
+		console.log(`Rate limit exceeded for IP: ${ip}`);
+		return c.json({ 
+			error: 'Too Many Requests', 
+			message: 'You can only parse 10 jobs per minute. Please wait.' 
+		}, 429);
+	}
 
-// RULES:
-// 1. Return ONLY valid JSON ARRAY of objects. Even if there is only one job, return it insie an array: [{"title": "Software Engineer", "company": "Google", ...}, {...}, ...]
-// 2. Extract ONLY from the text. No guessing.
-// 3. COMPANY: If not explicitly stated, infer from email domains or source URLs (e.g., 'jobs.netflix.com' -> 'Netflix')..
-// 4. LOCATION rules:
-//    - If a city/country AND work mode are mentioned, use: "City, Country (Work Mode)" (e.g., "Lagos, Nigeria (Remote); New York, USA (Onsite)". 
-// 	 - If ONLY "Remote" is mentioned without a city, return "Remote". 
-// 	 - If ONLY a city is mentioned, return the "City, Country". 
-// 	 - If everything is missing, return "N/A".
-// 5. SALARY: Capture ranges and detect ALL currency symbols ($, ₦, £, €, etc.). Always include the frequency (e.g., '$120k/year', '₦1.2M/month', '€50/hour').
-// 6. REQUIREMENTS: This MUST be a flat array of strings. Extract all technical skills, frameworks, and tools (e.g., 'Excel', 'React', 'NYSC Member', 'Attention to detail', 'Docker', 'AWS').
-// 7. CONTACT_INFO: Capture ONLY specific, actionable credentials: - Full Emails - Phone numbers - Specific URLs - Specific handles (e.g., "@TechGuy") DO NOT capture vague instructions like "DM", "Inbox", "Check bio", or "PM". If no specific credential is found, return "N/A".
-// 8. Missing fields → "N/A"
-// 9. If the job post is in a language other than English, translate it first before extracting data.
+	// Increment and save
+	record.count++;
+	rateLimitMap.set(ip, record);
 
-// VALID:
-// []
-// [{"title":"..."}]
+	await next();
+};
 
-// INVALID:
-// {"error":"..."}
-// "Here is your result..."
-// 						`
-// 					},
-// 					{ role: 'user', content: text }
-// 				],
-// 				response_format: { type: 'json_object' }
-// 			})
-// 		})
-
-// 		const extractData: any = await extractRes.json()
-// 		const extractContent = JSON.parse(extractData.choices[0]?.message?.content || '{}')
-		
-// 		// AI might return { "jobs": [] } or just the array. We handle both.
-// 		const rawJobs = Array.isArray(extractContent) ? extractContent : (extractContent.jobs || [extractContent])
-
-// 		// 🔒 FINAL MAPPING & CLEANUP
-// 		const cleanedJobs = rawJobs.map((job: any) => ({
-// 			title: job.title || 'N/A',
-// 			company: job.company || 'N/A',
-// 			location: job.location || 'N/A',
-// 			salary: job.salary || 'N/A',
-// 			requirements: Array.isArray(job.requirements) ? job.requirements : [],
-// 			contact_info: typeof job.contact_info === 'string' ? job.contact_info : 'N/A',
-// 			source_url: sourceUrl || 'N/A',
-// 			raw_text: text
-// 		}))
-
-// 		return c.json(cleanedJobs)
-
-// 	} catch (error) {
-// 		console.error('Extraction Error:', error)
-// 		return c.json({ error: 'Internal Server Error' }, 500)
-// 	}
-// })
-
-app.post('/api/parse', async (c) => {
+app.post('/api/parse', rateLimiter, async (c) => {
 	const { text, sourceUrl } = await c.req.json()
 
 	// Initial length guardrail
@@ -201,7 +117,7 @@ Example of job: {"jobs": [{"title": "...", "company": "...", ...}]}
 			console.error('Groq API Error:', data.error)
 			return c.json({ error: 'AI provider error' }, 502)
 		}
-		
+
 		const content = JSON.parse(data.choices[0]?.message?.content || '{"jobs": []}')
 		
 		// If the AI determined it wasn't a job, content.jobs will be []
