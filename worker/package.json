@@ -17,7 +17,9 @@
     "wrangler": "^4.82.2"
   },
   "dependencies": {
+    "@hono/sentry": "^1.2.2",
     "@libsql/client": "^0.17.2",
+    "@sentry/cloudflare": "^10.50.0",
     "hono": "^4.12.12"
   }
 }

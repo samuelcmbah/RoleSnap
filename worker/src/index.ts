@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { sentry } from '@hono/sentry' // Hono has a built-in wrapper for Sentry
 import { createClient } from '@libsql/client'
 
 // defines the expected shape of the environment variables
@@ -6,9 +7,16 @@ type Bindings = {
 	GROQ_API_KEY: string
 	TURSO_DATABASE_URL: string
 	TURSO_AUTH_TOKEN: string
+	SENTRY_DSN: string
 }
 
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new Hono<{ Bindings: Bindings }>() //Hono runs the api. receives requests, routes them, runs middleware, provide contextObject... sends response back
+
+// This middleware catches all unhandled exceptions
+app.use('*', async (c, next) => {
+  const sentryHandler = sentry({ dsn: c.env.SENTRY_DSN });
+  return sentryHandler(c, next);
+})
 
 // helper function to connect to the Turso database
 const getDbClient = (env: Bindings) => {
@@ -53,6 +61,9 @@ const rateLimiter = async (c: any, next: any) => {
 	await next();
 };
 
+// ========================
+// PARSE ENDPOINT
+// ========================
 app.post('/api/parse', rateLimiter, async (c) => {
 	const { text, sourceUrl } = await c.req.json()
 
@@ -110,6 +121,24 @@ Example of job: {"jobs": [{"title": "...", "company": "...", ...}]}
 			})
 		})
 
+
+		// Check if Groq returned an error (like Rate Limit or Authentication)
+		if (!response.ok) {
+			const errorData = await response.text();
+
+			// MANUAL CAPTURE: Send Groq failures to Sentry
+			const sentry = c.get('sentry');
+			if (sentry) 
+				sentry.withScope((scope) => {
+					scope.setExtra('status', response.status)
+					scope.setExtra('body', errorData)
+
+					sentry.captureMessage(`Groq API Error: ${response.status}`)
+				})
+			
+			return c.json({ error: 'AI processing failed' }, 502);
+		}
+
 		const data: any = await response.json()
 
 		// Handle Groq-level errors (rate limits, etc.)
@@ -142,9 +171,10 @@ Example of job: {"jobs": [{"title": "...", "company": "...", ...}]}
 
 		return c.json(cleanedJobs)
 
-	} catch (error) {
+	} catch (error: any) {
 		console.error('Extraction Error:', error)
-		return c.json({ error: 'Failed to parse text' }, 500)
+
+		throw error; // Let the Sentry middleware catch this
 	}
 })
 
