@@ -1,0 +1,18 @@
+[
+  {
+    "title": "NYSC Software Developer",
+    "company": "Beyond Systems",
+    "location": "Anthony, Lagos State, Nigeria",
+    "salary": "N/A",
+    "requirements": [
+      "Python",
+      "JavaScript",
+      "PHP",
+      "Java",
+      "NYSC Member"
+    ],
+    "contact_info": "temitope.eze@beyondsystemsng.com",
+    "source_url": "Test Suite: sample-11.txt",
+    "raw_text": "NYSC Software Developer role available\r\n\r\nLocation: Anthony (Lagos State, Nigeria)\r\n\r\nLooking for NYSC corps members with background in programming (Python, JavaScript, PHP, Java, etc.) willing to use the company as their PPA.\r\n\r\nYou’ll get hands-on experience, real projects, and mentorship.\r\n\r\nSend CV, tech stack, and portfolio to: temitope.eze@beyondsystemsng.com"
+  }
+]

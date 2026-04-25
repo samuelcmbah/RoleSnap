@@ -1,0 +1,14 @@
+[
+  {
+    "title": "HR Manager",
+    "company": "Parallelscore",
+    "location": "Surulere, Nigeria (Hybrid)",
+    "salary": "₦350,000/month",
+    "requirements": [
+      "At least 3 years of experience"
+    ],
+    "contact_info": "b.okusanya@parallelscore.com",
+    "source_url": "Test Suite: sample-09.txt",
+    "raw_text": "HR Manager with at least 3 years of experience for a Hospital in Surulere\r\nThe role is hybrid \r\n\r\nSalary 350,000\r\n\r\nApplicants should send their resume to b.okusanya@parallelscore.com"
+  }
+]

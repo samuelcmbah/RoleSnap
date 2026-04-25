@@ -1,0 +1,38 @@
+[
+  {
+    "title": "Data Analytics Instructor",
+    "company": "N/A",
+    "location": "Port Harcourt, Nigeria",
+    "salary": "N/A",
+    "requirements": [
+      "Data Analytics"
+    ],
+    "contact_info": "N/A",
+    "source_url": "Test Suite: sample-01.txt",
+    "raw_text": "Someone is looking for \r\n* Data Analytics instructor \r\n* Digital marketing Instructor \r\n* Cyber security instructor \r\n\r\nIf you base in PH please DM  asap."
+  },
+  {
+    "title": "Digital Marketing Instructor",
+    "company": "N/A",
+    "location": "Port Harcourt, Nigeria",
+    "salary": "N/A",
+    "requirements": [
+      "Digital Marketing"
+    ],
+    "contact_info": "N/A",
+    "source_url": "Test Suite: sample-01.txt",
+    "raw_text": "Someone is looking for \r\n* Data Analytics instructor \r\n* Digital marketing Instructor \r\n* Cyber security instructor \r\n\r\nIf you base in PH please DM  asap."
+  },
+  {
+    "title": "Cyber Security Instructor",
+    "company": "N/A",
+    "location": "Port Harcourt, Nigeria",
+    "salary": "N/A",
+    "requirements": [
+      "Cyber Security"
+    ],
+    "contact_info": "N/A",
+    "source_url": "Test Suite: sample-01.txt",
+    "raw_text": "Someone is looking for \r\n* Data Analytics instructor \r\n* Digital marketing Instructor \r\n* Cyber security instructor \r\n\r\nIf you base in PH please DM  asap."
+  }
+]
