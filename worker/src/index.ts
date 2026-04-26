@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { sentry } from '@hono/sentry' // Hono has a built-in wrapper for Sentry
 import { createClient } from '@libsql/client'
+import { cors } from 'hono/cors'
 
 // defines the expected shape of the environment variables
 type Bindings = {
@@ -12,6 +13,8 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>() //Hono runs the api. receives requests, routes them, runs middleware, provide contextObject... sends response back
 
+app.use('/api/*', cors()) //enable CORS for all routes under /api
+	
 // This middleware catches all unhandled exceptions
 app.use('*', async (c, next) => {
   const sentryHandler = sentry({ dsn: c.env.SENTRY_DSN });
