@@ -6,6 +6,7 @@
 
   "permissions": [
     "contextMenus",
+    "sidePanel",
     "activeTab",
     "storage",
     "scripting",
@@ -17,9 +18,11 @@
     "type": "module"
   },
 
+  "side_panel": {
+    "default_path": "index.html"
+  },
   "action": {
-    "default_popup": "index.html",
-    "default_title": "RoleSnap"
+    "default_title": "Click to open RoleSnap"
   },
   "icons": {
     "16": "icon16.png",
