@@ -156,6 +156,8 @@ async function handleJobCapture(text: string, sourceUrl: string) {
         message: 'Job captured and saved!'
       });
     }
+
+    
   }
   catch (error: any) {
     console.error("Error in handleJobCapture:", error);
