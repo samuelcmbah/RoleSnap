@@ -2,17 +2,29 @@ const API_BASE_URL = 'https://rolesnap-worker.samuelcmbah.workers.dev'; //live w
 
 // Create a right-click menu item, when the extension is installed
 chrome.runtime.onInstalled.addListener(() => {
+  if (chrome.sidePanel) {
+    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+      .catch((error) => console.error("SidePanel Setup Error:", error));
+  } else {
+    console.error("SidePanel API not found! Check your manifest.json permissions.");
+  }
+
   chrome.contextMenus.create({
     id: "save-job",
     title: "Save Job to RoleSnap",
     contexts: ["selection"]
   });
-  console.log("Context menu 'Save to RoleSnap' created.");
+
+  console.log("RoleSnap initialized: Sidebar behavior set and Context Menu created.");
 });
 
 // Listen for the click on the Context Menu
-chrome.contextMenus.onClicked.addListener(async(info, tab) => {
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === "save-job") {
+    if (!tab || !tab.windowId || !tab.id) {
+      console.error("Context menu clicked, but tab information is missing.");
+      return;
+    }
 
     const selectedText = info.selectionText ?? "";
     const sourceUrl = tab?.url ?? "";
@@ -20,11 +32,48 @@ chrome.contextMenus.onClicked.addListener(async(info, tab) => {
     console.log("Selected text captured:", selectedText.substring(0, 50) + "...");
     console.log("Source URL:", sourceUrl);
 
+    // OPEN THE SIDE PANEL AUTOMATICALLY
+    // This ensures that if the user right-clicks to save, the sidebar 
+    // opens up so they can see the loading/success state.
+    await chrome.sidePanel.open({
+      tabId: tab.id,
+      windowId: tab.windowId
+    });
+
+    // Notify Popup we are starting
+    await chrome.storage.local.set({
+      lastAction: {
+        status: 'loading',
+        jobs: []
+      }
+    });
+
+    // Broadcast to popup if it's currently open
+    chrome.runtime.sendMessage({
+      type: 'STATUS_UPDATE',
+      status: 'loading'
+    });
+
+
+
     // this is where we'll POST to the API
     try {
       await handleJobCapture(selectedText, sourceUrl);
+
     } catch (error) {
       console.error("Capture failed:", error);
+
+      await chrome.storage.local.set({
+        lastAction: {
+          status: 'error',
+          jobs: []
+        }
+      });
+
+      chrome.runtime.sendMessage({
+        type: 'STATUS_UPDATE',
+        status: 'error'
+      });
     }
   }
 });
@@ -45,11 +94,27 @@ async function handleJobCapture(text: string, sourceUrl: string) {
       throw new Error(errorData.error || "Failed to parse");
     }
 
-    const parsedJobs = await parseResponse.json();
+    const response = await parseResponse.json();
 
+    const parsedJobs = Array.isArray(response.data) ? response.data : [response.data];
+
+    console.log("Parsed jobs received from API:", parsedJobs);
     if (parsedJobs.length === 0) {
-      console.warn("Parsing succeeded but no jobs were extracted.");
+      await chrome.storage.local.set({
+        lastAction: {
+          status: 'error',
+          jobs: []
+        }
+      });
+
+      chrome.runtime.sendMessage({
+        type: 'STATUS_UPDATE',
+        status: 'error'
+      });
+
+      return;
     }
+
 
     // Save the parsed job(s) to your Turso DB via your Worker
     const saveResponse = await fetch(`${API_BASE_URL}/api/jobs`, {
@@ -61,6 +126,28 @@ async function handleJobCapture(text: string, sourceUrl: string) {
     if (saveResponse.ok) {
       console.log("✅ Job successfully saved to RoleSnap!");
 
+
+      // 2. Store success state for the Popup
+      const successData = {
+        status: 'success',
+        jobs: Array.isArray(parsedJobs) ? parsedJobs : [parsedJobs]
+      };
+
+      await chrome.storage.local.set({
+        lastAction: {
+          status: 'success',
+          jobs: successData.jobs
+        }
+      });
+
+      chrome.runtime.sendMessage({
+        type: 'STATUS_UPDATE',
+        status: 'success',
+        jobs: successData.jobs
+      });
+
+
+
       // Optional: Visual feedback (Notification)
       chrome.notifications.create({
         type: 'basic',
@@ -69,9 +156,23 @@ async function handleJobCapture(text: string, sourceUrl: string) {
         message: 'Job captured and saved!'
       });
     }
+
+    
   }
   catch (error: any) {
     console.error("Error in handleJobCapture:", error);
+
+    await chrome.storage.local.set({
+      lastAction: {
+        status: 'error',
+        jobs: []
+      }
+    });
+
+    chrome.runtime.sendMessage({
+      type: 'STATUS_UPDATE',
+      status: 'error'
+    });
   }
 
 }
