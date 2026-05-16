@@ -3,4 +3,5 @@ export type Bindings = {
 	TURSO_DATABASE_URL: string
 	TURSO_AUTH_TOKEN: string
 	SENTRY_DSN: string
+	WHATSAPP_VERIFY_TOKEN: string
 }

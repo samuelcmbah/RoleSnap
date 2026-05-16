@@ -21,6 +21,7 @@ GROQ_API_KEY=your_groq_key_here
 TURSO_DATABASE_URL=libsql://your-db-name.turso.io
 TURSO_AUTH_TOKEN=your_auth_token_here
 SENTRY_DSN=your_sentry_dsn_here
+WHATSAPP_VERIFY_TOKEN=your_meta_verify_token_here
 ```
 
 ### 3. Run Locally
@@ -36,6 +37,7 @@ npx wrangler secret put GROQ_API_KEY
 npx wrangler secret put TURSO_DATABASE_URL
 npx wrangler secret put TURSO_AUTH_TOKEN
 npx wrangler secret put SENTRY_DSN
+npx wrangler secret put WHATSAPP_VERIFY_TOKEN
 npm run deploy
 ```
 
@@ -96,6 +98,17 @@ Inserts parsed job data into the Turso database. Currently hardcoded to `user-12
 `GET /api/jobs`
 
 Returns all jobs saved for the current user, ordered by most recent.
+
+
+### 4. WhatsApp Webhook
+
+`GET /webhook`
+
+Handles Meta verification (`hub.mode`, `hub.verify_token`, `hub.challenge`) and echoes the challenge when valid.
+
+`POST /webhook`
+
+Receives incoming WhatsApp Cloud API webhook events. Current behavior logs payload and returns `200 OK`.
 
 ---
 
