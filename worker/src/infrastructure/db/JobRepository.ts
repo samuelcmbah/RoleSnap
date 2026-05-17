@@ -5,16 +5,18 @@ export class JobRepository {
   constructor(private db: DbClient) {}
 
   async saveBatch(jobs: Job[], userId: string) {
-    if (!jobs.length) return
+    if (!jobs.length) return []
 
-    const queries = jobs.map(job => ({
+    const jobIds = jobs.map(() => crypto.randomUUID())
+
+    const queries = jobs.map((job, index) => ({
       sql: `INSERT INTO jobs (
         id, user_id, title, company, location, salary,
         requirements, contact_info, source_url, raw_text,
         status, source_method
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
-        crypto.randomUUID(),
+        jobIds[index],
         userId,
         job.title ?? '',
         job.company ?? '',
@@ -25,12 +27,13 @@ export class JobRepository {
         job.source_url ?? '',
         job.raw_text ?? '',
         'saved',
-        'manual'
+        job.source_method ?? 'manual'
       ]
     }))
 
     try {
       await this.db.batch(queries, "write") 
+      return jobIds
     } catch (err) {
       console.error("DB batch insert error:", err)
       throw err

@@ -21,14 +21,18 @@ jobsRoute.post('/', async (c) => {
     })
     const tempUserId = 'user-123'
 
-    const jobsArray = Array.isArray(jobData) ? jobData : [jobData]
+    const jobsArray = Array.isArray(jobData)
+      ? jobData
+      : Array.isArray(jobData?.data)
+        ? jobData.data
+        : [jobData]
     console.log(`Parsed ${jobsArray.length} jobs from request ID:`, requestId)
     const useCase = new SaveJobs(new JobRepository(db))
-    await useCase.execute(jobsArray, tempUserId)
+    const ids = await useCase.execute(jobsArray, tempUserId)
     console.log(`Successfully saved ${jobsArray.length} jobs for request ID:`, requestId)
     return c.json({
       success: true,
-      data: { count: jobsArray.length }
+      data: { count: jobsArray.length, ids }
     }, 201)
 
   } catch (err: any) {
