@@ -9,6 +9,11 @@ export type WhatsAppWebhookPayload = {
             body?: string
           }
         }>
+        statuses?: Array<{
+          id?: string
+          status?: string
+          recipient_id?: string
+        }>
       }
     }>
   }>

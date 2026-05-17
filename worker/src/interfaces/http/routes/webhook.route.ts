@@ -13,6 +13,35 @@ import {
 
 export const webhookRoute = new Hono<{ Bindings: Bindings }>()
 
+const maskPhoneNumber = (value?: string) => {
+  if (!value) return 'missing'
+  return value.length <= 4 ? '****' : `****${value.slice(-4)}`
+}
+
+const logWebhookDebug = (
+  requestId: string,
+  event: string,
+  details: Record<string, unknown> = {}
+) => {
+  console.log(`[webhook:${requestId}] ${event}`, JSON.stringify(details))
+}
+
+const summarizeWhatsAppPayload = (payload: WhatsAppWebhookPayload) => {
+  const entries = payload.entry ?? []
+  const changes = entries.flatMap((entry) => entry.changes ?? [])
+  const messages = changes.flatMap((change) => change.value?.messages ?? [])
+  const statuses = changes.flatMap((change) => change.value?.statuses ?? [])
+
+  return {
+    entryCount: entries.length,
+    changeCount: changes.length,
+    messageCount: messages.length,
+    messageTypes: messages.map((message) => message.type ?? 'unknown'),
+    statusCount: statuses.length,
+    statusTypes: statuses.map((status) => status.status ?? 'unknown')
+  }
+}
+
 export const extractIncomingWhatsAppMessage = (
   payload: WhatsAppWebhookPayload
 ): IncomingWhatsAppMessage | null => {
@@ -50,9 +79,18 @@ const toSavedJobs = (rawJobs: any[], text: string, sender: string): Job[] => {
 export const sendWhatsAppTextReply = async (
   env: Bindings,
   to: string,
-  text: string
+  text: string,
+  requestId = 'manual'
 ) => {
-  const graphVersion = env.WHATSAPP_GRAPH_API_VERSION || 'v18.0'
+  const graphVersion = env.WHATSAPP_GRAPH_API_VERSION || 'v25.0'
+  logWebhookDebug(requestId, 'sending WhatsApp reply', {
+    graphVersion,
+    phoneNumberIdPresent: Boolean(env.WHATSAPP_PHONE_NUMBER_ID),
+    accessTokenPresent: Boolean(env.WHATSAPP_ACCESS_TOKEN),
+    to: maskPhoneNumber(to),
+    textLength: text.length
+  })
+
   const response = await fetch(
     `https://graph.facebook.com/${graphVersion}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
     {
@@ -75,78 +113,134 @@ export const sendWhatsAppTextReply = async (
 
   if (!response.ok) {
     const errorText = await response.text()
+    logWebhookDebug(requestId, 'WhatsApp reply failed', {
+      status: response.status,
+      response: errorText
+    })
     throw new Error(`WhatsApp reply failed: ${response.status} - ${errorText}`)
   }
+
+  logWebhookDebug(requestId, 'WhatsApp reply sent', {
+    status: response.status,
+    to: maskPhoneNumber(to)
+  })
 }
 
 export const processIncomingWhatsAppMessage = async (
   payload: WhatsAppWebhookPayload,
-  env: Bindings
+  env: Bindings,
+  requestId = crypto.randomUUID()
 ) => {
+  logWebhookDebug(requestId, 'background processing started', summarizeWhatsAppPayload(payload))
+
   const message = extractIncomingWhatsAppMessage(payload)
 
   if (!message) {
-    console.log('WhatsApp webhook ignored: no user message found')
+    logWebhookDebug(requestId, 'ignored webhook: no incoming user message found', summarizeWhatsAppPayload(payload))
     return
   }
 
+  logWebhookDebug(requestId, 'incoming message extracted', {
+    from: maskPhoneNumber(message.from),
+    type: message.type,
+    textLength: message.text?.length ?? 0
+  })
+
   // Users may send stickers, images, or voice notes before text support exists.
   if (message.type !== 'text' || !message.text) {
+    logWebhookDebug(requestId, 'unsupported message type', {
+      from: maskPhoneNumber(message.from),
+      type: message.type
+    })
+
     await sendWhatsAppTextReply(
       env,
       message.from,
-      'Please forward a text job post for now.'
+      'Please forward a text job post for now.',
+      requestId
     ).catch((replyErr) => {
-      console.error('WhatsApp unsupported-message reply failed:', replyErr)
+      console.error(`[webhook:${requestId}] WhatsApp unsupported-message reply failed:`, replyErr)
     })
     return
   }
 
   try {
+    logWebhookDebug(requestId, 'starting Groq parse', {
+      textLength: message.text.length
+    })
+
     const parser = new ParseJobText(new GroqClient(env.GROQ_API_KEY))
     const rawJobs = await parser.execute(message.text)
+
+    logWebhookDebug(requestId, 'Groq parse completed', {
+      jobCount: rawJobs.length
+    })
 
     if (rawJobs.length === 0) {
       await sendWhatsAppTextReply(
         env,
         message.from,
-        "That doesn't look like a job post. Try a job listing."
+        "That doesn't look like a job post. Try a job listing.",
+        requestId
       )
       return
     }
 
+    logWebhookDebug(requestId, 'creating database client')
     const db = getDbClient(env)
     const jobs = toSavedJobs(rawJobs, message.text, message.from)
+    logWebhookDebug(requestId, 'saving parsed jobs', {
+      jobCount: jobs.length,
+      sourceMethod: 'whatsapp',
+      userId: `whatsapp:${maskPhoneNumber(message.from)}`
+    })
+
     const saveJobs = new SaveJobs(new JobRepository(db))
     const ids = await saveJobs.execute(jobs, `whatsapp:${message.from}`)
+    logWebhookDebug(requestId, 'jobs saved', {
+      count: ids.length,
+      firstJobId: ids[0] ?? null
+    })
+
     const dashboardUrl = env.DASHBOARD_URL || 'https://rolesnap.xyz'
     const firstJobUrl = `${dashboardUrl.replace(/\/$/, '')}/job/${ids[0]}`
     const reply = rawJobs.length === 1
       ? `Job saved! ${firstJobUrl}`
       : `${rawJobs.length} jobs saved! ${dashboardUrl.replace(/\/$/, '')}/jobs`
 
-    await sendWhatsAppTextReply(env, message.from, reply)
+    await sendWhatsAppTextReply(env, message.from, reply, requestId)
   } catch (err) {
-    console.error('WhatsApp webhook processing failed:', err)
+    console.error(`[webhook:${requestId}] WhatsApp webhook processing failed:`, err)
     await sendWhatsAppTextReply(
       env,
       message.from,
-      'Sorry, we had trouble reading that. Try again soon.'
+      'Sorry, we had trouble reading that. Try again soon.',
+      requestId
     ).catch((replyErr) => {
-      console.error('WhatsApp failure reply failed:', replyErr)
+      console.error(`[webhook:${requestId}] WhatsApp failure reply failed:`, replyErr)
     })
   }
 }
 
 webhookRoute.get('/', (c) => {
+  const requestId = crypto.randomUUID()
   const mode = c.req.query('hub.mode')
   const verifyToken = c.req.query('hub.verify_token')
   const challenge = c.req.query('hub.challenge')
+  const tokenMatches = verifyToken === c.env.WHATSAPP_VERIFY_TOKEN
 
-  if (mode === 'subscribe' && verifyToken === c.env.WHATSAPP_VERIFY_TOKEN && challenge) {
+  logWebhookDebug(requestId, 'GET verification request received', {
+    mode,
+    tokenMatches,
+    hasChallenge: Boolean(challenge)
+  })
+
+  if (mode === 'subscribe' && tokenMatches && challenge) {
+    logWebhookDebug(requestId, 'GET verification succeeded')
     return c.text(challenge, 200)
   }
 
+  logWebhookDebug(requestId, 'GET verification failed')
   return c.json({
     success: false,
     error: {
@@ -157,9 +251,17 @@ webhookRoute.get('/', (c) => {
 })
 
 webhookRoute.post('/', async (c) => {
+  const requestId = crypto.randomUUID()
+  logWebhookDebug(requestId, 'POST webhook entered', {
+    method: c.req.method,
+    contentType: c.req.header('content-type') ?? null,
+    userAgent: c.req.header('user-agent') ?? null
+  })
+
   const payload = await c.req.json().catch(() => null)
 
   if (!payload) {
+    logWebhookDebug(requestId, 'invalid JSON payload')
     return c.json({
       success: false,
       error: {
@@ -169,8 +271,13 @@ webhookRoute.post('/', async (c) => {
     }, 400)
   }
 
-  console.log('WhatsApp webhook received')
-  c.executionCtx.waitUntil(processIncomingWhatsAppMessage(payload, c.env))
+  logWebhookDebug(requestId, 'JSON payload parsed', summarizeWhatsAppPayload(payload))
+  c.executionCtx.waitUntil(
+    processIncomingWhatsAppMessage(payload, c.env, requestId).catch((err) => {
+      console.error(`[webhook:${requestId}] unhandled waitUntil failure:`, err)
+    })
+  )
+  logWebhookDebug(requestId, 'background processing scheduled')
 
   return c.json({
     success: true,

@@ -12,7 +12,6 @@ export const getDbClient = (env: Bindings) => {
     })
     console.log('DB client created once')
     console.log('URL:', env.TURSO_DATABASE_URL)
-    console.log('TOKEN (first 10 chars):', env.TURSO_AUTH_TOKEN?.slice(0, 10))
   }
 
   return db
