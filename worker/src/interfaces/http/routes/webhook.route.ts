@@ -1,4 +1,6 @@
 import { Hono } from 'hono'
+import { getSentry } from '@hono/sentry'
+import { Toucan } from 'toucan-js'
 import { Bindings } from '../../../shared/types/Bindings'
 import { GroqClient } from '../../../infrastructure/ai/GroqClient'
 import { ParseJobText } from '../../../application/use-cases/ParseJobText'
@@ -13,6 +15,8 @@ import {
 
 export const webhookRoute = new Hono<{ Bindings: Bindings }>()
 
+type WebhookErrorReporter = Toucan
+
 const maskPhoneNumber = (value?: string) => {
   if (!value) return 'missing'
   return value.length <= 4 ? '****' : `****${value.slice(-4)}`
@@ -24,6 +28,26 @@ const logWebhookDebug = (
   details: Record<string, unknown> = {}
 ) => {
   console.log(`[webhook:${requestId}] ${event}`, JSON.stringify(details))
+}
+
+const captureWebhookException = (
+  sentry: WebhookErrorReporter | undefined,
+  err: unknown,
+  requestId: string,
+  stage: string,
+  details: Record<string, unknown> = {}
+) => {
+  if (!sentry) return
+
+  sentry.withScope((scope) => {
+    scope.setTag('feature', 'whatsapp_webhook')
+    scope.setTag('webhook_stage', stage)
+    scope.setContext('whatsapp_webhook', {
+      requestId,
+      ...details
+    })
+    scope.captureException(err)
+  })
 }
 
 const summarizeWhatsAppPayload = (payload: WhatsAppWebhookPayload) => {
@@ -129,7 +153,8 @@ export const sendWhatsAppTextReply = async (
 export const processIncomingWhatsAppMessage = async (
   payload: WhatsAppWebhookPayload,
   env: Bindings,
-  requestId = crypto.randomUUID()
+  requestId = crypto.randomUUID(),
+  sentry?: WebhookErrorReporter
 ) => {
   logWebhookDebug(requestId, 'background processing started', summarizeWhatsAppPayload(payload))
 
@@ -160,6 +185,10 @@ export const processIncomingWhatsAppMessage = async (
       requestId
     ).catch((replyErr) => {
       console.error(`[webhook:${requestId}] WhatsApp unsupported-message reply failed:`, replyErr)
+      captureWebhookException(sentry, replyErr, requestId, 'unsupported_message_reply', {
+        messageType: message.type,
+        to: maskPhoneNumber(message.from)
+      })
     })
     return
   }
@@ -211,6 +240,12 @@ export const processIncomingWhatsAppMessage = async (
     await sendWhatsAppTextReply(env, message.from, reply, requestId)
   } catch (err) {
     console.error(`[webhook:${requestId}] WhatsApp webhook processing failed:`, err)
+    captureWebhookException(sentry, err, requestId, 'process_message', {
+      messageType: message.type,
+      from: maskPhoneNumber(message.from),
+      textLength: message.text.length
+    })
+
     await sendWhatsAppTextReply(
       env,
       message.from,
@@ -218,6 +253,10 @@ export const processIncomingWhatsAppMessage = async (
       requestId
     ).catch((replyErr) => {
       console.error(`[webhook:${requestId}] WhatsApp failure reply failed:`, replyErr)
+      captureWebhookException(sentry, replyErr, requestId, 'failure_reply', {
+        originalFailure: err instanceof Error ? err.message : String(err),
+        to: maskPhoneNumber(message.from)
+      })
     })
   }
 }
@@ -272,9 +311,11 @@ webhookRoute.post('/', async (c) => {
   }
 
   logWebhookDebug(requestId, 'JSON payload parsed', summarizeWhatsAppPayload(payload))
+  const sentry = getSentry(c)
   c.executionCtx.waitUntil(
-    processIncomingWhatsAppMessage(payload, c.env, requestId).catch((err) => {
+    processIncomingWhatsAppMessage(payload, c.env, requestId, sentry).catch((err) => {
       console.error(`[webhook:${requestId}] unhandled waitUntil failure:`, err)
+      captureWebhookException(sentry, err, requestId, 'wait_until')
     })
   )
   logWebhookDebug(requestId, 'background processing scheduled')
