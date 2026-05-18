@@ -21,6 +21,11 @@ GROQ_API_KEY=your_groq_key_here
 TURSO_DATABASE_URL=libsql://your-db-name.turso.io
 TURSO_AUTH_TOKEN=your_auth_token_here
 SENTRY_DSN=your_sentry_dsn_here
+WHATSAPP_VERIFY_TOKEN=your_meta_verify_token_here
+WHATSAPP_PHONE_NUMBER_ID=your_meta_phone_number_id_here
+WHATSAPP_ACCESS_TOKEN=your_meta_whatsapp_access_token_here
+WHATSAPP_GRAPH_API_VERSION=v18.0
+DASHBOARD_URL=https://rolesnap.xyz
 ```
 
 ### 3. Run Locally
@@ -36,6 +41,11 @@ npx wrangler secret put GROQ_API_KEY
 npx wrangler secret put TURSO_DATABASE_URL
 npx wrangler secret put TURSO_AUTH_TOKEN
 npx wrangler secret put SENTRY_DSN
+npx wrangler secret put WHATSAPP_VERIFY_TOKEN
+npx wrangler secret put WHATSAPP_PHONE_NUMBER_ID
+npx wrangler secret put WHATSAPP_ACCESS_TOKEN
+npx wrangler secret put WHATSAPP_GRAPH_API_VERSION
+npx wrangler secret put DASHBOARD_URL
 npm run deploy
 ```
 
@@ -96,6 +106,27 @@ Inserts parsed job data into the Turso database. Currently hardcoded to `user-12
 `GET /api/jobs`
 
 Returns all jobs saved for the current user, ordered by most recent.
+
+
+### 4. WhatsApp Webhook
+
+`GET /webhook`
+
+Handles Meta verification (`hub.mode`, `hub.verify_token`, `hub.challenge`) and echoes the challenge when valid.
+
+`POST /webhook`
+
+Receives incoming WhatsApp Cloud API webhook events.
+
+Current behavior:
+
+- Extracts text from `entry[0].changes[0].value.messages[0].text.body`.
+- Extracts the sender from `entry[0].changes[0].value.messages[0].from`.
+- Parses the text through Groq using the existing job parser.
+- Saves parsed jobs to Turso with `source_method: "whatsapp"` and `user_id: "whatsapp:{sender}"`.
+- Replies to the sender through WhatsApp Cloud API with a saved-job link.
+- Replies with help text for unsupported message types such as images, stickers, and voice notes.
+- Replies with a graceful error if parsing or saving fails.
 
 ---
 

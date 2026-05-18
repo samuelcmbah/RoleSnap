@@ -5,6 +5,7 @@ import { Bindings } from "./shared/types/Bindings"
 import { errorHandler } from "./interfaces/http/middleware/errorHandler"
 import { parseRoute } from "./interfaces/http/routes/parse.route"
 import { jobsRoute } from "./interfaces/http/routes/jobs.route"
+import { webhookRoute } from "./interfaces/http/routes/webhook.route"
 
 const app = new Hono<{ Bindings: Bindings }>()
 
@@ -23,5 +24,6 @@ app.get('/', (c) => {
 
 app.route('/api/parse', parseRoute)
 app.route('/api/jobs', jobsRoute)
+app.route('/webhook', webhookRoute)
 
 export default app

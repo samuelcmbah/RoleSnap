@@ -5,8 +5,8 @@ export class SaveJobs {
 	constructor(private repo: JobRepository) {}
 
 	async execute(jobs: Job[], userId: string) {
-		if (!jobs.length) return
+		if (!jobs.length) return []
 
-		await this.repo.saveBatch(jobs, userId)
+		return this.repo.saveBatch(jobs, userId)
 	}
 }
