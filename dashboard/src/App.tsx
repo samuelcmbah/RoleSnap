@@ -1,41 +1,63 @@
-import { 
-  SignedIn, 
-  SignedOut, 
-  SignInButton, 
-  UserButton, 
-  useUser 
-} from "@clerk/clerk-react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { SignIn, SignedIn, SignedOut } from "@clerk/clerk-react";
+import { Layout } from "./components/Layout";
+import { AuthGuard } from "./components/AuthGuard";
+
+// These are temporary components. We will build real ones in Days 6 and 7!
+const DashboardHome = () => (
+  <div>
+    <h2 className="text-2xl font-bold mb-4">Dashboard Overview</h2>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200">
+        <p className="text-slate-500 text-sm">Total Jobs</p>
+        <p className="text-3xl font-bold">0</p>
+      </div>
+      <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200">
+        <p className="text-slate-500 text-sm">Interviews</p>
+        <p className="text-3xl font-bold text-blue-600">0</p>
+      </div>
+    </div>
+  </div>
+);
+
+const MyJobs = () => (
+  <div>
+    <h2 className="text-2xl font-bold mb-4">My Job Applications</h2>
+    <p className="text-slate-500 text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
+      No jobs saved yet. Use the Chrome Extension or WhatsApp bot to start!
+    </p>
+  </div>
+);
 
 function App() {
-  const { user } = useUser();
-
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      <header className="mb-8 text-center">
-        <h1 className="text-4xl font-bold text-blue-600">RoleSnap</h1>
-        <p className="text-slate-500">Your AI-Powered Job Tracker</p>
-      </header>
-
-      <SignedOut>
-        <div className="bg-white p-8 rounded-xl shadow-md border border-slate-200">
-          <p className="mb-4 text-center">Sign in to manage your job applications</p>
-          <div className="flex justify-center bg-blue-600 text-white rounded-lg px-4 py-2 hover:bg-blue-700 transition-colors">
-            <SignInButton mode="modal" />
+    <BrowserRouter>
+      <Routes>
+        {/* 1. THE LOGIN ROUTE: No Sidebar here */}
+        <Route path="/login" element={
+          <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+            <SignIn routing="path" path="/login" signUpUrl="/login" />
           </div>
-        </div>
-      </SignedOut>
+        } />
 
-      <SignedIn>
-        <div className="flex flex-col items-center gap-4">
-          <UserButton afterSignOutUrl="/" />
-          <h2 className="text-xl">Welcome back, {user?.firstName}!</h2>
-          <div className="p-4 bg-green-100 text-green-800 rounded-md">
-            Authentication is working.
-          </div>
-        </div>
-      </SignedIn>
-    </div>
-  )
+        {/* 2. THE PROTECTED ROUTES: Everything inside here uses the Layout (Sidebar) */}
+        <Route path="/" element={
+          <AuthGuard>
+            <Layout />
+          </AuthGuard>
+        }>
+          {/* This index route means '/' will show DashboardHome inside the Layout */}
+          <Route index element={<DashboardHome />} />
+          <Route path="jobs" element={<MyJobs />} />
+          <Route path="insights" element={<div className="text-2xl font-bold">Salary Insights (Coming Week 17)</div>} />
+          <Route path="settings" element={<div className="text-2xl font-bold">Settings</div>} />
+        </Route>
+
+        {/* 3. CATCH-ALL: If user goes to a random URL, send them home */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
