@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { SignIn, SignedIn, SignedOut } from "@clerk/clerk-react";
+import { SignIn } from "@clerk/clerk-react";
 import { Layout } from "./components/Layout";
 import { AuthGuard } from "./components/AuthGuard";
 
