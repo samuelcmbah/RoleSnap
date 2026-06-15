@@ -5,6 +5,7 @@ import { JobRepository } from '../../../infrastructure/db/JobRepository'
 import { SaveJobs } from '../../../application/use-cases/SaveJob'
 import { GetJobs } from '../../../application/use-cases/GetJob'
 import { AppError } from '../../../shared/errors/AppError'
+import { extractUserIdFromToken } from '../../../shared/utils/tokenUtils'
 
 export const jobsRoute = new Hono<{ Bindings: Bindings }>()
 
@@ -19,7 +20,7 @@ jobsRoute.post('/', async (c) => {
       console.error('Invalid JSON payload for request ID:', requestId, err)
       throw new AppError('Invalid JSON payload', 'INVALID_JSON', 400)
     })
-    const tempUserId = 'user-123'
+    const userId = extractUserIdFromToken(c.req.header('Authorization'))
 
     const jobsArray = Array.isArray(jobData)
       ? jobData
@@ -28,7 +29,7 @@ jobsRoute.post('/', async (c) => {
         : [jobData]
     console.log(`Parsed ${jobsArray.length} jobs from request ID:`, requestId)
     const useCase = new SaveJobs(new JobRepository(db))
-    const ids = await useCase.execute(jobsArray, tempUserId)
+    const ids = await useCase.execute(jobsArray, userId)
     console.log(`Successfully saved ${jobsArray.length} jobs for request ID:`, requestId)
     return c.json({
       success: true,
@@ -65,11 +66,10 @@ jobsRoute.get('/', async (c) => {
 
   try {
     const db = getDbClient(c.env)
-console.log('DB:', db)
-    const tempUserId = 'user-123'
+    const userId = extractUserIdFromToken(c.req.header('Authorization'))
 
     const useCase = new GetJobs(new JobRepository(db))
-    const jobs = await useCase.execute(tempUserId)
+    const jobs = await useCase.execute(userId)
 
     return c.json({
       success: true,

@@ -1,11 +1,17 @@
 import { useState } from "react";
-import { UserButton } from "@clerk/clerk-react";
+import { useAuth, UserButton } from "@clerk/clerk-react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { LayoutDashboard, Briefcase, BarChart3, Settings, Menu, X, Plus } from "lucide-react";
+import { parseJob, saveJob } from "../api/jobs";
 
 export const Layout = () => {
+  const { getToken } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isPasteJobOpen, setIsPasteJobOpen] = useState(false);
+  const [jobText, setJobText] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const location = useLocation();
 
   const navItems = [
@@ -17,8 +23,58 @@ export const Layout = () => {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const handlePasteJob = () => {
+  const handleOpenPasteModal = () => {
     setIsPasteJobOpen(true);
+    setError("");
+    setSuccessMessage("");
+    setJobText("");
+  };
+
+  const handleClosePasteModal = () => {
+    setIsPasteJobOpen(false);
+    setError("");
+    setSuccessMessage("");
+    setJobText("");
+    setIsLoading(false);
+  };
+
+  const handlePasteJobSubmit = async () => {
+    if (!jobText.trim()) {
+      setError("Please paste job text");
+      return;
+    }
+
+    setError("");
+    setSuccessMessage("");
+    setIsLoading(true);
+
+    try {
+      const token = await getToken();
+      
+      // Parse the job text
+      const parsedJobs = await parseJob(jobText, undefined, token ?? undefined);
+      
+      if (!parsedJobs || parsedJobs.length === 0) {
+        setError("Could not parse job from text. Please check the format and try again.");
+        setIsLoading(false);
+        return;
+      }
+
+      // Save the first parsed job
+      const jobToSave = parsedJobs[0];
+      await saveJob(jobToSave, token ?? undefined);
+      
+      setSuccessMessage("✓ Job saved successfully! Check 'My Jobs' to view it.");
+      setJobText("");
+      
+      // Close modal after 2 seconds
+      setTimeout(() => {
+        handleClosePasteModal();
+      }, 2000);
+    } catch (err: any) {
+      setError(err.message || "Failed to parse and save job");
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -80,7 +136,7 @@ export const Layout = () => {
 
           <div className="ml-auto flex items-center gap-3 md:gap-4">
             <button 
-              onClick={handlePasteJob}
+              onClick={handleOpenPasteModal}
               className="flex items-center gap-2 px-3 md:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm md:text-base font-medium"
             >
               <Plus size={18} />
@@ -96,34 +152,54 @@ export const Layout = () => {
         </main>
       </div>
 
-      {/* Paste Job Modal (Placeholder - will integrate next) */}
+      {/* Paste Job Modal */}
       {isPasteJobOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-slate-900">Paste a Job Posting</h2>
               <button 
-                onClick={() => setIsPasteJobOpen(false)}
+                onClick={handleClosePasteModal}
                 className="p-2 hover:bg-slate-100 rounded-lg"
               >
                 <X size={24} />
               </button>
             </div>
+
+            {error && (
+              <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700">
+                <p className="font-semibold">Error</p>
+                <p className="text-sm mt-1">{error}</p>
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-4 text-green-700">
+                <p className="font-semibold">{successMessage}</p>
+              </div>
+            )}
+
             <textarea 
-              className="w-full h-40 p-4 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              value={jobText}
+              onChange={(e) => setJobText(e.target.value)}
+              disabled={isLoading}
+              className="w-full h-40 p-4 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:bg-slate-50 disabled:text-slate-400"
               placeholder="Paste any job posting text here (from WhatsApp, Twitter, LinkedIn, etc.)..."
             />
             <div className="mt-4 flex gap-3 justify-end">
               <button 
-                onClick={() => setIsPasteJobOpen(false)}
-                className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors font-medium text-slate-700"
+                onClick={handleClosePasteModal}
+                disabled={isLoading}
+                className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors font-medium text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button 
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                onClick={handlePasteJobSubmit}
+                disabled={isLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Parse & Save
+                {isLoading ? "Parsing..." : "Parse & Save"}
               </button>
             </div>
           </div>
