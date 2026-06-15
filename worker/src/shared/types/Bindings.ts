@@ -8,4 +8,6 @@ export type Bindings = {
 	WHATSAPP_ACCESS_TOKEN: string
 	WHATSAPP_GRAPH_API_VERSION?: string
 	DASHBOARD_URL?: string
+	CLERK_PUBLISHABLE_KEY?: string
+	CLERK_SECRET_KEY?: string
 }

@@ -249,7 +249,7 @@ export const processIncomingWhatsAppMessage = async (
     await sendWhatsAppTextReply(
       env,
       message.from,
-      'Sorry, we had trouble reading that. Try again soon.',
+      'Sorry, we had trouble reading that. Try a proper job listing.',
       requestId
     ).catch((replyErr) => {
       console.error(`[webhook:${requestId}] WhatsApp failure reply failed:`, replyErr)

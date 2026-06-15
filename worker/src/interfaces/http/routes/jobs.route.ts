@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { clerkMiddleware, getAuth } from '@clerk/hono'
 import { Bindings } from '../../../shared/types/Bindings'
 import { getDbClient } from '../../../infrastructure/db/DbClient'
 import { JobRepository } from '../../../infrastructure/db/JobRepository'
@@ -7,6 +8,8 @@ import { GetJobs } from '../../../application/use-cases/GetJob'
 import { AppError } from '../../../shared/errors/AppError'
 
 export const jobsRoute = new Hono<{ Bindings: Bindings }>()
+
+jobsRoute.use('*', clerkMiddleware())
 
 jobsRoute.post('/', async (c) => {
   const requestId = crypto.randomUUID()
@@ -19,7 +22,11 @@ jobsRoute.post('/', async (c) => {
       console.error('Invalid JSON payload for request ID:', requestId, err)
       throw new AppError('Invalid JSON payload', 'INVALID_JSON', 400)
     })
-    const tempUserId = 'user-123'
+    const auth = getAuth(c)
+    const userId = auth?.userId
+    if (!userId) {
+      throw new AppError('Unauthorized', 'AUTH_REQUIRED', 401)
+    }
 
     const jobsArray = Array.isArray(jobData)
       ? jobData
@@ -28,7 +35,7 @@ jobsRoute.post('/', async (c) => {
         : [jobData]
     console.log(`Parsed ${jobsArray.length} jobs from request ID:`, requestId)
     const useCase = new SaveJobs(new JobRepository(db))
-    const ids = await useCase.execute(jobsArray, tempUserId)
+    const ids = await useCase.execute(jobsArray, userId)
     console.log(`Successfully saved ${jobsArray.length} jobs for request ID:`, requestId)
     return c.json({
       success: true,
@@ -65,11 +72,14 @@ jobsRoute.get('/', async (c) => {
 
   try {
     const db = getDbClient(c.env)
-console.log('DB:', db)
-    const tempUserId = 'user-123'
+    const auth = getAuth(c)
+    const userId = auth?.userId
+    if (!userId) {
+      throw new AppError('Unauthorized', 'AUTH_REQUIRED', 401)
+    }
 
     const useCase = new GetJobs(new JobRepository(db))
-    const jobs = await useCase.execute(tempUserId)
+    const jobs = await useCase.execute(userId)
 
     return c.json({
       success: true,
