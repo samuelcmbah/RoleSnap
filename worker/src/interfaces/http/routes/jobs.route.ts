@@ -1,13 +1,15 @@
 import { Hono } from 'hono'
+import { clerkMiddleware, getAuth } from '@clerk/hono'
 import { Bindings } from '../../../shared/types/Bindings'
 import { getDbClient } from '../../../infrastructure/db/DbClient'
 import { JobRepository } from '../../../infrastructure/db/JobRepository'
 import { SaveJobs } from '../../../application/use-cases/SaveJob'
 import { GetJobs } from '../../../application/use-cases/GetJob'
 import { AppError } from '../../../shared/errors/AppError'
-import { extractUserIdFromToken } from '../../../shared/utils/tokenUtils'
 
 export const jobsRoute = new Hono<{ Bindings: Bindings }>()
+
+jobsRoute.use('*', clerkMiddleware())
 
 jobsRoute.post('/', async (c) => {
   const requestId = crypto.randomUUID()
@@ -20,7 +22,11 @@ jobsRoute.post('/', async (c) => {
       console.error('Invalid JSON payload for request ID:', requestId, err)
       throw new AppError('Invalid JSON payload', 'INVALID_JSON', 400)
     })
-    const userId = extractUserIdFromToken(c.req.header('Authorization'))
+    const auth = getAuth(c)
+    const userId = auth?.userId
+    if (!userId) {
+      throw new AppError('Unauthorized', 'AUTH_REQUIRED', 401)
+    }
 
     const jobsArray = Array.isArray(jobData)
       ? jobData
@@ -66,7 +72,11 @@ jobsRoute.get('/', async (c) => {
 
   try {
     const db = getDbClient(c.env)
-    const userId = extractUserIdFromToken(c.req.header('Authorization'))
+    const auth = getAuth(c)
+    const userId = auth?.userId
+    if (!userId) {
+      throw new AppError('Unauthorized', 'AUTH_REQUIRED', 401)
+    }
 
     const useCase = new GetJobs(new JobRepository(db))
     const jobs = await useCase.execute(userId)
