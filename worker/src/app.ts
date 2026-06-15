@@ -1,6 +1,7 @@
 import { Hono } from "hono"
 import { cors } from "hono/cors"
 import { sentry } from '@hono/sentry'
+import { clerkMiddleware } from '@clerk/hono'
 import { Bindings } from "./shared/types/Bindings"
 import { errorHandler } from "./interfaces/http/middleware/errorHandler"
 import { parseRoute } from "./interfaces/http/routes/parse.route"
@@ -17,6 +18,8 @@ app.use('*', async (c, next) => {
 
 app.use('*', errorHandler)
 app.use('/api/*', cors())
+app.use('/api/jobs/*', clerkMiddleware())
+app.use('/api/jobs', clerkMiddleware())
 
 app.get('/', (c) => {
 	return c.text('RoleSnap API is running!')
