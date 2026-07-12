@@ -1,4 +1,34 @@
 const API_BASE_URL = 'https://rolesnap-worker.samuelcmbah.workers.dev'; //live worker URL
+const TOKEN_POLL_INTERVAL = 250
+const TOKEN_POLL_TIMEOUT = 8000
+
+const readClerkTokenFromStorage = () => {
+  return new Promise<{ clerkToken?: string | null; clerkTokenError?: string | null }>((resolve) => {
+    chrome.storage.local.get(['clerkToken', 'clerkTokenError'], (result) => {
+      resolve(result as { clerkToken?: string | null; clerkTokenError?: string | null })
+    })
+  })
+}
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const getClerkToken = async (): Promise<string | null> => {
+  const deadline = Date.now() + TOKEN_POLL_TIMEOUT
+
+  while (Date.now() < deadline) {
+    const result = await readClerkTokenFromStorage()
+    if (result.clerkToken) {
+      return result.clerkToken
+    }
+    if (result.clerkTokenError) {
+      console.warn('Clerk token error from dashboard iframe:', result.clerkTokenError)
+      return null
+    }
+    await delay(TOKEN_POLL_INTERVAL)
+  }
+
+  return null
+}
 
 // Create a right-click menu item, when the extension is installed
 chrome.runtime.onInstalled.addListener(() => {
@@ -53,8 +83,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       type: 'STATUS_UPDATE',
       status: 'loading'
     });
-
-
 
     // this is where we'll POST to the API
     try {
@@ -115,51 +143,57 @@ async function handleJobCapture(text: string, sourceUrl: string) {
       return;
     }
 
+    const token = await getClerkToken();
+    if (!token) {
+      console.error('Missing Clerk token for /api/jobs request');
+      throw new Error('Not authenticated with Clerk. Open the dashboard and sign in to connect the extension.');
+    }
 
     // Save the parsed job(s) to your Turso DB via your Worker
     const saveResponse = await fetch(`${API_BASE_URL}/api/jobs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
       body: JSON.stringify(parsedJobs)
     });
 
-    if (saveResponse.ok) {
-      console.log("✅ Job successfully saved to RoleSnap!");
-
-
-      // 2. Store success state for the Popup
-      const successData = {
-        status: 'success',
-        jobs: Array.isArray(parsedJobs) ? parsedJobs : [parsedJobs]
-      };
-
-      await chrome.storage.local.set({
-        lastAction: {
-          status: 'success',
-          jobs: successData.jobs
-        }
-      });
-
-      chrome.runtime.sendMessage({
-        type: 'STATUS_UPDATE',
-        status: 'success',
-        jobs: successData.jobs
-      });
-
-
-
-      // Optional: Visual feedback (Notification)
-      chrome.notifications.create({
-        type: 'basic',
-        iconUrl: 'icon128.png',
-        title: 'RoleSnap',
-        message: 'Job captured and saved!'
-      });
+    if (!saveResponse.ok) {
+      const errorData = await saveResponse.json();
+      console.error('Save API Error:', errorData.error);
+      throw new Error(errorData.error?.message || 'Failed to save jobs');
     }
 
-    
-  }
-  catch (error: any) {
+    console.log("✅ Job successfully saved to RoleSnap!");
+
+    // 2. Store success state for the Popup
+    const successData = {
+      status: 'success',
+      jobs: Array.isArray(parsedJobs) ? parsedJobs : [parsedJobs]
+    };
+
+    await chrome.storage.local.set({
+      lastAction: {
+        status: 'success',
+        jobs: successData.jobs
+      }
+    });
+
+    chrome.runtime.sendMessage({
+      type: 'STATUS_UPDATE',
+      status: 'success',
+      jobs: successData.jobs
+    });
+
+    // Optional: Visual feedback (Notification)
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icon128.png',
+      title: 'RoleSnap',
+      message: 'Job captured and saved!'
+    });
+  } catch (error: any) {
     console.error("Error in handleJobCapture:", error);
 
     await chrome.storage.local.set({
@@ -174,5 +208,4 @@ async function handleJobCapture(text: string, sourceUrl: string) {
       status: 'error'
     });
   }
-
 }
