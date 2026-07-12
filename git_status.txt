@@ -1,0 +1,7 @@
+﻿ M dashboard/src/App.tsx
+ M dashboard/src/components/Layout.tsx
+ M extension/src/App.tsx
+ M extension/src/background.ts
+?? .git_diff_output.txt
+?? dashboard/src/pages/ExtensionAuth.tsx
+?? git_status.txt

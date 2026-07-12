@@ -6,6 +6,7 @@ import { DashboardHome } from "./pages/DashboardHome";
 import { MyJobs } from "./pages/MyJobs";
 import { Insights } from "./pages/Insights";
 import { Settings } from "./pages/Settings";
+import { ExtensionAuth } from "./pages/ExtensionAuth";
 
 function App() {
   return (
@@ -30,7 +31,10 @@ function App() {
           <Route path="settings" element={<Settings />} />
         </Route>
 
-        {/* 3. CATCH-ALL: If user goes to a random URL, send them home */}
+        {/* 3. EXTENSION TOKEN BRIDGE: Hidden iframe page used by the Chrome extension */}
+        <Route path="/extension-auth" element={<ExtensionAuth />} />
+
+        {/* 4. CATCH-ALL: If user goes to a random URL, send them home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

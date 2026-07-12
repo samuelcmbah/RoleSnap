@@ -55,6 +55,7 @@ export const Layout = () => {
       const parsedJobs = await parseJob(jobText, undefined, token ?? undefined);
       
       if (!parsedJobs || parsedJobs.length === 0) {
+        
         setError("Could not parse job from text. Please check the format and try again.");
         setIsLoading(false);
         return;
