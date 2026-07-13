@@ -1,6 +1,6 @@
 # RoleSnap Worker (Cloudflare API)
 
-The backend service for RoleSnap, built with **Hono** and deployed on **Cloudflare Workers**. Handles AI job parsing, database operations, WhatsApp webhook processing, and Clerk authentication.
+The backend service for RoleSnap, built with **Hono** and deployed on **Cloudflare Workers**. Handles AI job parsing, database operations, message-forward webhook processing, Clerk authentication, and email delivery via Resend.
 
 ---
 
@@ -65,7 +65,7 @@ Parse raw job text into structured JSON using Groq AI.
 **Request:**
 ```json
 {
-  "text": "Hiring a Senior React dev at Kuda. ₦1.2M/mo. Remote. Apply at hr@kuda.com",
+  "text": "Hiring a Senior React dev at Kuda. Remote. Apply at hr@kuda.com",
   "sourceUrl": "https://whatsapp.com/..."
 }
 ```
@@ -79,8 +79,8 @@ Parse raw job text into structured JSON using Groq AI.
       "title": "Senior React Developer",
       "company": "Kuda",
       "location": "Remote",
-      "salary": "₦1.2M/month",
-      "requirements": ["React"],
+      "salary": "N/A",
+      "stack": ["React"],
       "contact_info": "hr@kuda.com",
       "source_url": "https://whatsapp.com/...",
       "raw_text": "..."
@@ -126,8 +126,8 @@ Save parsed job(s) to the database. Requires Clerk authentication.
   "title": "Senior React Developer",
   "company": "Kuda",
   "location": "Remote",
-  "salary": "₦1.2M/month",
-  "requirements": ["React"],
+  "salary": "N/A",
+  "stack": ["React"],
   "contact_info": "hr@kuda.com",
   "source_url": "https://...",
   "raw_text": "..."
@@ -180,6 +180,124 @@ Get all jobs for the authenticated user. Requires Clerk authentication.
 
 ---
 
+### GET /api/jobs/search
+
+Search and filter saved jobs. Requires Clerk authentication.
+
+**Headers:** `Authorization: Bearer <clerk_token>`
+
+**Query params:** `?q=react&stack=React&location=Remote&status=saved`
+
+**Success (200):**
+```json
+{
+  "success": true,
+  "data": [ ... ]
+}
+```
+
+> **Note:** This endpoint is not yet implemented in the Worker. The dashboard API client will need a `searchJobs()` function when it's built.
+
+---
+
+### PATCH /api/jobs/:id/status
+
+Update job status (triggered by Kanban drag-and-drop). Requires Clerk authentication.
+
+**Headers:** `Authorization: Bearer <clerk_token>`
+
+**Request:**
+```json
+{
+  "status": "applied"
+}
+```
+
+**Success (200):**
+```json
+{
+  "success": true,
+  "data": { "id": "uuid", "status": "applied" }
+}
+```
+
+> **Note:** This endpoint is not yet implemented in the Worker. The dashboard API client already has `updateJobStatus()` ready.
+
+---
+
+### PATCH /api/jobs/:id/notes
+
+Update user's notes on a job. Requires Clerk authentication.
+
+**Headers:** `Authorization: Bearer <clerk_token>`
+
+**Request:**
+```json
+{
+  "notes": "Called the recruiter, waiting for callback"
+}
+```
+
+> **Note:** This endpoint is not yet implemented in the Worker. The dashboard API client already has `updateJobNotes()` ready.
+
+---
+
+### PATCH /api/jobs/:id/reminder
+
+Set or clear a follow-up reminder date. Requires Clerk authentication.
+
+**Headers:** `Authorization: Bearer <clerk_token>`
+
+**Request:**
+```json
+{
+  "follow_up_date": "2026-08-01T09:00:00Z"
+}
+```
+
+To clear: send `"follow_up_date": null`.
+
+> **Note:** This endpoint is not yet implemented in the Worker.
+
+---
+
+### POST /api/notifications/prefs
+
+Update a user's notification preferences (email/WhatsApp opt-ins). Requires Clerk authentication.
+
+**Headers:** `Authorization: Bearer <clerk_token>`
+
+**Request:**
+```json
+{
+  "email_reminders_opt_in": true,
+  "weekly_digest_opt_in": false,
+  "whatsapp_reminders_opt_in": true
+}
+```
+
+> **Note:** This endpoint is not yet implemented in the Worker.
+
+---
+
+### POST /api/notifications/test
+
+Send a test reminder email (for development/debugging). Requires Clerk authentication.
+
+**Headers:** `Authorization: Bearer <clerk_token>`
+
+> **Note:** This endpoint is not yet implemented in the Worker.
+
+---
+
+### GET /api/insights/salaries
+
+Aggregated anonymous salary data by stack and location.
+
+> **Note:** This endpoint is not yet implemented in the Worker.
+
+---
+
 ### GET /webhook
 
 WhatsApp webhook verification (called by Meta during setup).
@@ -219,6 +337,7 @@ All processing happens in `c.executionCtx.waitUntil()` — the webhook returns 2
 | `WHATSAPP_PHONE_NUMBER_ID` | Meta WhatsApp Business phone number ID |
 | `WHATSAPP_ACCESS_TOKEN` | Meta WhatsApp permanent access token |
 | `WHATSAPP_GRAPH_API_VERSION` | Meta Graph API version (default: v25.0) |
+| `RESEND_API_KEY` | Resend API key for email delivery |
 | `DASHBOARD_URL` | Dashboard URL for job links in WhatsApp replies |
 | `CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
 | `CLERK_SECRET_KEY` | Clerk secret key |
@@ -228,40 +347,48 @@ All processing happens in `c.executionCtx.waitUntil()` — the webhook returns 2
 ## Known Issues
 
 ### 1. Missing PATCH Endpoints
-The dashboard's API client (`dashboard/src/api/jobs.ts`) already has functions for `updateJobStatus()` and `updateJobNotes()`, but the Worker does not have these routes implemented:
+The dashboard's API client already has functions for `updateJobStatus()` and `updateJobNotes()`, but the Worker does not have these routes implemented:
 - `PATCH /api/jobs/:id/status` — needed for Kanban drag-and-drop
 - `PATCH /api/jobs/:id/notes` — needed for auto-saving notes
 
-### 2. Missing Database Tables
+### 2. Missing Reminder Endpoints
+- `PATCH /api/jobs/:id/reminder` — not implemented
+- `POST /api/notifications/prefs` — not implemented
+- `POST /api/notifications/test` — not implemented
+
+### 3. Missing Search Endpoint
+- `GET /api/jobs/search` — not implemented. Needed once users have 50+ saved jobs.
+
+### 4. Missing Salary Insights Endpoint
+- `GET /api/insights/salaries` — not implemented.
+
+### 5. Missing Database Operations
 The `JobRepository` only has `saveBatch` and `findByUser`. Missing:
 - `updateStatus(jobId, newStatus)` — also needs to insert into `status_history`
 - `updateNotes(jobId, notes)`
-- `findStatusHistory(jobId)`
+- `updateReminder(jobId, followUpDate)`
+- `searchJobs(userId, params)` — filter by text, stack, location, status
+- `findByFollowUpDate(date)` — for cron reminders
+- `markNotified(jobId)` — mark follow_up_notified = true
+- `upsertNotificationPrefs(userId, prefs)`
+- `getNotificationPrefs(userId)`
 - `insertShare(jobId, sharedVia)`
-- The `status_history` and `shares` tables may not exist in Turso yet
+- The `status_history`, `shares`, and `notification_prefs` tables may not exist in Turso yet
 
-### 3. wrangler.jsonc is Bare
+### 6. wrangler.jsonc is Bare
 The wrangler configuration is missing:
 - Environment variable bindings (`vars` section)
-- R2 bucket binding (for deprecated snapshot feature)
-- Browser Rendering binding (for deprecated snapshot feature)
-- Cron trigger binding (for follow-up reminders)
+- Cron trigger binding (for daily reminder checks and weekly digest)
 - Service bindings
 
-### 4. DbClient Singleton
+### 7. DbClient Singleton
 `DbClient.ts` uses a module-level singleton (`let db = null`). In Cloudflare Workers, this persists across requests in the same isolate, which is fine. But if the environment variables change (e.g., different Turso URL per environment), the singleton won't reinitialize. Consider using a factory pattern instead.
 
-### 5. Rate Limiter is In-Memory
+### 8. Rate Limiter is In-Memory
 The rate limiter uses a `Map<string, { count, lastReset }>` in memory. This means:
 - Rate limits reset when the Worker restarts (new isolate)
 - Rate limits are per-isolate, not global — a user hitting different edge locations could exceed the limit
 - For production, consider using Cloudflare's built-in rate limiting or a Durable Object
-
-### 6. No Public Endpoints
-The following endpoints from the roadmap are not implemented:
-- `GET /api/jobs/public` — public job board feed
-- `GET /api/insights/salaries` — aggregated salary data
-- `POST /api/shares` — track shares
 
 ---
 
@@ -269,8 +396,11 @@ The following endpoints from the roadmap are not implemented:
 
 1. **Add PATCH routes** — `PATCH /api/jobs/:id/status` and `PATCH /api/jobs/:id/notes`
 2. **Add status_history operations** — update `JobRepository` to insert into `status_history` on status change
-3. **Configure wrangler.jsonc** — add environment variable bindings
-4. **Add shares endpoint** — `POST /api/shares` for viral analytics
-5. **Add public jobs endpoint** — `GET /api/jobs/public` for community board
-6. **Add salary insights endpoint** — `GET /api/insights/salaries`
-7. **Write unit tests** — Vitest is installed but only has a placeholder test
+3. **Add search endpoint** — `GET /api/jobs/search` with query params for text, stack, location, status
+4. **Add reminder endpoints** — `PATCH /api/jobs/:id/reminder`, `POST /api/notifications/prefs`, `POST /api/notifications/test`
+5. **Add Resend email helper** — `sendEmail(to, subject, body)` using Resend API
+6. **Add Cloudflare Cron Trigger** — daily check for due reminders, weekly digest
+7. **Add salary insights endpoint** — `GET /api/insights/salaries`
+8. **Add shares endpoint** — `POST /api/shares` for viral analytics
+9. **Configure wrangler.jsonc** — add environment variable bindings and cron triggers
+10. **Write unit tests** — Vitest is installed but only has a placeholder test
