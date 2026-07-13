@@ -2,11 +2,11 @@
 
 ## System Overview
 
-RoleSnap has three user-facing surfaces (Chrome Extension, WhatsApp Bot, Dashboard) that all feed into a single Cloudflare Worker API, which handles AI parsing via Groq and persists data to Turso (libSQL). Authentication is handled by Clerk across all surfaces.
+RoleSnap has three user-facing surfaces (Chrome Extension, Message-Forward Bot, Dashboard) that all feed into a single Cloudflare Worker API, which handles AI parsing via Groq and persists data to Turso (libSQL). Authentication is handled by Clerk across all surfaces. Email reminders are sent via Resend.
 
 **Surfaces:**
 - **Chrome Extension** — Right-click any selected text on any website to save a job
-- **WhatsApp Bot** — Forward a job message to a WhatsApp number, it gets saved automatically
+- **Message-Forward Bot** — Forward a job message to a WhatsApp number, it gets saved automatically
 - **Dashboard** — Web app at rolesnap.xyz for viewing, managing, and tracking jobs on a Kanban board
 
 **Backend:**
@@ -14,6 +14,7 @@ RoleSnap has three user-facing surfaces (Chrome Extension, WhatsApp Bot, Dashboa
 - **Groq AI (Llama 3.3 70B)** — Extracts structured job data from unstructured text
 - **Turso (libSQL)** — Edge-replicated database for fast reads anywhere
 - **Clerk** — Authentication (Google OAuth + email/password)
+- **Resend** — Email delivery for follow-up reminders and weekly digest
 
 ---
 
@@ -54,6 +55,14 @@ RoleSnap has three user-facing surfaces (Chrome Extension, WhatsApp Bot, Dashboa
 | **Hono middleware** | `@clerk/hono` provides `clerkMiddleware()` and `getAuth()` — drops into existing Hono routes in 2 lines. |
 | **Extension support** | Clerk works in browsers (for the dashboard) and can be relayed to Chrome extensions via postMessage/iframe bridge. |
 | **Social login** | Google OAuth out of the box — reduces sign-up friction. |
+
+### Why Resend?
+
+| Factor | Decision |
+|---|---|
+| **Free tier** | 3,000 emails/month — covers reminder emails and weekly digests through the first thousand users. |
+| **API simplicity** | Single `fetch` call to send an email. No SDK required, no complex setup. |
+| **Why not SendGrid/Mailgun?** | Resend's free tier is more generous for early-stage volume, and the API is significantly simpler. |
 
 ### Why Vercel?
 
@@ -104,7 +113,7 @@ Chrome extensions can't use Clerk directly (service workers have no DOM, no cook
 
 ## Data Flow: Saving a Job
 
-All three sources (extension, WhatsApp, dashboard) follow the same pipeline:
+All three sources (extension, message-forward bot, dashboard) follow the same pipeline:
 
 `Raw Text → Groq AI Parse → Structured JSON → Save to Turso → Return Job ID`
 
@@ -116,7 +125,7 @@ All three sources (extension, WhatsApp, dashboard) follow the same pipeline:
 5. Sends parsed job + token to `POST /api/jobs`
 6. Shows success in side panel
 
-### WhatsApp Bot
+### Message-Forward Bot
 1. User forwards message to WhatsApp number
 2. Meta sends webhook to `POST /webhook`
 3. Worker extracts text from Meta payload
@@ -145,15 +154,14 @@ All three sources (extension, WhatsApp, dashboard) follow the same pipeline:
 | company | TEXT | Company name (AI-extracted) |
 | location | TEXT | Location (AI-extracted) |
 | salary | TEXT | Salary range (AI-extracted) |
-| requirements | TEXT[] | Array of tech skills converted to JSON string in DB |
+| stack | TEXT[] | Array of tech skills, e.g. [React, Node.js] |
 | contact_info | TEXT | Email/phone from post |
-| source_url | TEXT | URL of original job post |
-| raw_text | TEXT | Original pasted text — NEVER delete this |
-| snapshot_url | TEXT | (Deprecated — see below) |
-| snapshot_type | TEXT | (Deprecated — see below) |
+| source_url | TEXT | Where the job came from, if any |
+| raw_text | TEXT | Original pasted/forwarded text — NEVER delete this |
 | status | TEXT | saved, applied, interview, offer, rejected |
-| notes | TEXT | User's private notes |
-| follow_up_date | TIMESTAMP | Reminder date |
+| notes | TEXT | User's private notes on this job |
+| follow_up_date | TIMESTAMP | Reminder date set by user |
+| follow_up_notified | BOOLEAN | Whether a reminder has already fired |
 | source_method | TEXT | 'extension', 'whatsapp', or 'manual' |
 | created_at | TIMESTAMP | Auto-set when job is saved |
 
@@ -176,23 +184,23 @@ All three sources (extension, WhatsApp, dashboard) follow the same pipeline:
 | shared_via | TEXT | 'whatsapp', 'twitter', or 'copy' |
 | shared_at | TIMESTAMP | When it was shared |
 
+### notification_prefs
+
+| Column | Type | Purpose |
+|---|---|---|
+| user_id | TEXT PRIMARY KEY | Links to Clerk user |
+| email | TEXT | User's email, from Clerk |
+| email_reminders_opt_in | BOOLEAN | Follow-up reminder emails |
+| weekly_digest_opt_in | BOOLEAN | Weekly summary email |
+| whatsapp_reminders_opt_in | BOOLEAN | Follow-up reminders via WhatsApp |
+
 ---
 
-## ⚠️ DEPRECATED: Snapshot Feature
+## Deferred Features
 
-**The screenshot/snapshot feature (Phase 3, Weeks 13-14) has been deprecated and will not be implemented.**
+The following features were considered but deferred until real users ask for them:
 
-This was originally planned as:
-- Cloudflare Browser Rendering (Puppeteer) to capture screenshots of job URLs
-- Fallback HTML card generator for WhatsApp-sourced jobs
-- Cloudflare R2 bucket for storing screenshots
-- Snapshot viewer modal in the dashboard
-- Lazy-loading images to save mobile data
-
-**Reason for deprecation:** The feature would add significant complexity (Browser Rendering setup, Puppeteer error handling, R2 bucket configuration) with limited value — most job URLs go dead within days, and the `raw_text` column preserves all original job data forever. The AI-parsed fields (title, company, salary, requirements) contain everything a user needs at a glance.
-
-**Database columns that exist but are unused:**
-- `jobs.snapshot_url` (always NULL)
-- `jobs.snapshot_type` (always NULL)
-
-**If you reconsider this feature in the future, it would go here in Phase 3 (between the Kanban dashboard and the public job board). The infrastructure notes are preserved in the roadmap.**
+- **Public Community Job Board** — Competes directly with LinkedIn, Jobberman, Indeed. Not a defensible moat for RoleSnap.
+- **AI Natural-Language Search** — Filter-based search covers the MVP. AI search can be added later if users with 200+ jobs need it.
+- **Screenshot / Snapshot Preservation** — Removed entirely. Adds significant complexity (Browser Rendering, R2) for limited value — `raw_text` preserves all original data.
+- **Saved-Search Email Alerts** — Natural extension once search and email reminders are stable, but not before.

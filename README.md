@@ -1,6 +1,6 @@
 # RoleSnap
 
-**AI-powered job tracker.** Save jobs from WhatsApp, Telegram, Twitter/X, LinkedIn, or any website — RoleSnap parses unstructured text into structured job data and tracks your application pipeline on a Kanban dashboard.
+**Turn any job post into an organized application.** Save jobs from WhatsApp, Telegram, Discord, Slack, email, or anywhere else you find them — not just job boards. RoleSnap parses unstructured text into structured job data and tracks your application pipeline on a Kanban dashboard.
 
 ---
 
@@ -10,7 +10,7 @@
 - **Wrangler CLI** (`npm install -g wrangler`)
 - **Chrome** (for extension development)
 - **Turso CLI** (for database management)
-- Accounts: [Groq](https://console.groq.com), [Clerk](https://clerk.com), [Sentry](https://sentry.io), [Meta for Developers](https://developers.facebook.com) (WhatsApp bot)
+- Accounts: [Groq](https://console.groq.com), [Clerk](https://clerk.com), [Resend](https://resend.com), [Sentry](https://sentry.io), [Meta for Developers](https://developers.facebook.com) (WhatsApp/Message-Forward Bot)
 
 ---
 
@@ -46,6 +46,7 @@ WHATSAPP_VERIFY_TOKEN=your_verify_token
 WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
 WHATSAPP_ACCESS_TOKEN=your_whatsapp_token
 WHATSAPP_GRAPH_API_VERSION=v25.0
+RESEND_API_KEY=your_resend_key
 DASHBOARD_URL=http://localhost:5173
 CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
 CLERK_SECRET_KEY=your_clerk_secret_key
@@ -130,6 +131,7 @@ Sends all 20+ test samples from `worker/test-samples/` to the live `/api/parse` 
 | `WHATSAPP_PHONE_NUMBER_ID` | Worker `.dev.vars` | WhatsApp message sending |
 | `WHATSAPP_ACCESS_TOKEN` | Worker `.dev.vars` | WhatsApp API authentication |
 | `WHATSAPP_GRAPH_API_VERSION` | Worker `.dev.vars` | WhatsApp API version (default: v25.0) |
+| `RESEND_API_KEY` | Worker `.dev.vars` | Email reminders and weekly digest |
 | `DASHBOARD_URL` | Worker `.dev.vars` | Job links in WhatsApp replies |
 | `CLERK_PUBLISHABLE_KEY` | Worker `.dev.vars` + Dashboard `.env` | Authentication |
 | `CLERK_SECRET_KEY` | Worker `.dev.vars` | Clerk API calls |
@@ -169,7 +171,8 @@ Build with `npm run build`, then zip the `dist/` folder and upload to the [Chrom
 | Database | Turso (libSQL) | Edge replication, 9GB free |
 | Auth | Clerk | 10k users free, Hono middleware |
 | Frontend | React + Vite + Tailwind | Fast dev, Vercel deploy |
+| Email | Resend | 3k emails/month free |
 | Error Tracking | Sentry | 5k errors/month free |
-| WhatsApp Bot | Meta Cloud API | 1k conversations/month free |
+| Message Bot | Meta WhatsApp Cloud API | 1k conversations/month free |
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed reasoning behind each choice.
