@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
-import { getJobs } from '../api/jobs'
+import { getJobs, updateJobStatus } from '../api/jobs'
 import type { JobRecord } from '../api/jobs'
+import { KanbanBoard, type JobStatus } from '../components/KanbanBoard'
 
 export const MyJobs = () => {
   const { getToken } = useAuth()
@@ -25,13 +26,36 @@ export const MyJobs = () => {
     fetchJobs()
   }, [getToken])
 
+  const handleStatusChange = async (jobId: string, newStatus: JobStatus) => {
+    try {
+      const token = await getToken()
+      
+      // Optimistic update
+      setJobs(prev => prev.map(job => 
+        job.id === jobId ? { ...job, status: newStatus } : job
+      ))
+
+      // API call
+      await updateJobStatus(jobId, newStatus, token ?? undefined)
+    } catch (err: any) {
+      // Rollback on failure
+      console.error('Failed to update job status:', err)
+      // Refetch to get correct state
+      const token = await getToken()
+      const data = await getJobs(token ?? undefined)
+      setJobs(data)
+      throw err
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-4">
         <div className="h-10 rounded-2xl bg-slate-200 animate-pulse" />
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="h-40 rounded-3xl bg-slate-200 animate-pulse" />
-          <div className="h-40 rounded-3xl bg-slate-200 animate-pulse" />
+        <div className="flex gap-4">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="w-80 h-96 rounded-2xl bg-slate-200 animate-pulse" />
+          ))}
         </div>
       </div>
     )
@@ -46,45 +70,12 @@ export const MyJobs = () => {
     )
   }
 
-  if (jobs.length === 0) {
-    return (
-      <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center">
-        <p className="text-slate-600 text-lg font-medium">No jobs saved yet.</p>
-        <p className="mt-2 text-slate-500">Use the Chrome Extension, WhatsApp bot, or paste a job to get started.</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {jobs.map((job) => (
-          <article key={job.id} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.25em] text-slate-400">{job.status}</p>
-                <h3 className="mt-3 text-xl font-semibold text-slate-900">{job.title}</h3>
-                <p className="mt-1 text-slate-600">{job.company}</p>
-              </div>
-              <div className="text-right text-xs text-slate-500">
-                {new Date(job.created_at).toLocaleDateString()}
-              </div>
-            </div>
-            <div className="mt-5 space-y-3 text-sm text-slate-600">
-              <p><strong>Location:</strong> {job.location}</p>
-              <p><strong>Salary:</strong> {job.salary}</p>
-              <p><strong>Contact:</strong> {job.contact_info}</p>
-            </div>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {job.requirements?.slice(0, 5).map((skill) => (
-                <span key={skill} className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">
-                  {skill}
-                </span>
-              ))}
-            </div>
-          </article>
-        ))}
-      </div>
+    <div className="h-[calc(100vh-8rem)]">
+      <KanbanBoard 
+        jobs={jobs} 
+        onStatusChange={handleStatusChange}
+      />
     </div>
   )
 }
