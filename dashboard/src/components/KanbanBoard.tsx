@@ -1,18 +1,17 @@
 import { useState } from 'react'
 import {
   DndContext,
-  DragEndEvent,
   DragOverlay,
-  DragStartEvent,
   PointerSensor,
   KeyboardSensor,
   useSensor,
   useSensors,
   closestCorners,
 } from '@dnd-kit/core'
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import KanbanColumn from './KanbanColumn'
-import JobCard from './JobCard'
+import { KanbanColumn } from './KanbanColumn'
+import { KanbanCard } from './KanbanCard'
 import type { JobRecord } from '../api/jobs'
 
 export type JobStatus = 'saved' | 'applied' | 'interview' | 'offer' | 'rejected'
@@ -97,7 +96,7 @@ export const KanbanBoard = ({ jobs, onStatusChange }: KanbanBoardProps) => {
       <DragOverlay>
         {activeJob && isDragging ? (
           <div className="rotate-3 scale-105 opacity-80">
-            <JobCard job={activeJob} isDragging />
+            <KanbanCard job={activeJob} isDragging />
           </div>
         ) : null}
       </DragOverlay>

@@ -15,6 +15,8 @@ export type JobRecord = ParsedJob & {
   created_at: string
   snapshot_url?: string
   snapshot_type?: string
+  source_method?: string
+  stack?: string[]
 }
 
 export type ApiResponse<T> = {

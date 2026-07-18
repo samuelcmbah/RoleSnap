@@ -1,6 +1,6 @@
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import KanbanCard from './KanbanCard'
+import { KanbanCard } from './KanbanCard'
 import type { JobRecord } from '../api/jobs'
 
 interface KanbanColumnProps {

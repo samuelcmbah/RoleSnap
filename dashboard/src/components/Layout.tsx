@@ -72,8 +72,8 @@ export const Layout = () => {
       setTimeout(() => {
         handleClosePasteModal();
       }, 2000);
-    } catch (err: any) {
-      setError(err.message || "Failed to parse and save job");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to parse and save job");
       setIsLoading(false);
     }
   };

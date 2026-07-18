@@ -16,8 +16,8 @@ export const MyJobs = () => {
         const token = await getToken()
         const data = await getJobs(token ?? undefined)
         setJobs(data)
-      } catch (err: any) {
-        setError(err.message || 'Unable to load saved jobs')
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Unable to load saved jobs')
       } finally {
         setLoading(false)
       }
@@ -37,7 +37,7 @@ export const MyJobs = () => {
 
       // API call
       await updateJobStatus(jobId, newStatus, token ?? undefined)
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Rollback on failure
       console.error('Failed to update job status:', err)
       // Refetch to get correct state
